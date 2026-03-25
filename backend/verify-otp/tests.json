@@ -1,0 +1,27 @@
+{
+  "tests": [
+    {
+      "name": "Verify OTP - wrong code",
+      "method": "POST",
+      "path": "/",
+      "body": {"phone": "+79991234567", "code": "000000", "role": "customer"},
+      "expectedStatus": 401,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Verify OTP - missing fields",
+      "method": "POST",
+      "path": "/",
+      "body": {},
+      "expectedStatus": 400,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    }
+  ]
+}
