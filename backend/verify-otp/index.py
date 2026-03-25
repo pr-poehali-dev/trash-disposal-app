@@ -25,6 +25,8 @@ def handler(event: dict, context) -> dict:
     phone = (body.get('phone') or '').strip()
     code = (body.get('code') or '').strip()
     role = body.get('role', 'customer')
+    reg_name = (body.get('name') or '').strip()
+    reg_address = (body.get('address') or '').strip()
 
     if not phone or not code:
         return {
@@ -68,20 +70,23 @@ def handler(event: dict, context) -> dict:
         cur.execute(f"UPDATE {SCHEMA}.otp_codes SET used = TRUE WHERE id = %s", (otp_id,))
 
         # Ищем или создаём пользователя
-        cur.execute(f"SELECT id, name, role, verified FROM {SCHEMA}.users WHERE phone = %s", (phone,))
+        cur.execute(f"SELECT id, name, role, verified, address FROM {SCHEMA}.users WHERE phone = %s", (phone,))
         user_row = cur.fetchone()
 
         is_new = False
         if user_row:
-            user_id, name, user_role, verified = user_row
+            user_id, name, user_role, verified, user_address = user_row
+            if reg_name and not name:
+                cur.execute(f"UPDATE {SCHEMA}.users SET name = %s WHERE id = %s", (reg_name, str(user_id)))
+                name = reg_name
         else:
             is_new = True
             cur.execute(
-                f"""INSERT INTO {SCHEMA}.users (phone, role) VALUES (%s, %s)
-                    RETURNING id, name, role, verified""",
-                (phone, role)
+                f"""INSERT INTO {SCHEMA}.users (phone, role, name, address) VALUES (%s, %s, %s, %s)
+                    RETURNING id, name, role, verified, address""",
+                (phone, role, reg_name or None, reg_address or None)
             )
-            user_id, name, user_role, verified = cur.fetchone()
+            user_id, name, user_role, verified, user_address = cur.fetchone()
 
         # Создаём сессию на 30 дней
         token = secrets.token_hex(32)
@@ -108,6 +113,7 @@ def handler(event: dict, context) -> dict:
                 'name': name,
                 'role': user_role,
                 'verified': verified,
+                'address': user_address,
             }
         })
     }

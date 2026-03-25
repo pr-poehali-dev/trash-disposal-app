@@ -9,6 +9,7 @@ type User = {
   phone: string;
   name: string | null;
   role: string;
+  address: string | null;
   verified: boolean;
 };
 
@@ -18,11 +19,51 @@ type Props = {
   onBack: () => void;
 };
 
-type Step = "phone" | "code";
+type Step = "register" | "code";
+
+function InputField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  accentColor,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  type?: string;
+  accentColor: string;
+}) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground mb-1.5">{label}</p>
+      <div
+        className="flex items-center gap-3 glass rounded-2xl px-4 py-3.5 border transition-all"
+        style={{ borderColor: value ? `${accentColor}40` : "rgba(255,255,255,0.1)" }}
+      >
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground text-sm outline-none"
+        />
+      </div>
+    </div>
+  );
+}
 
 export default function AuthScreen({ role, onSuccess, onBack }: Props) {
-  const [step, setStep] = useState<Step>("phone");
+  const [step, setStep] = useState<Step>("register");
+
+  const [lastName, setLastName] = useState("");
+  const [firstName, setFirstName] = useState("");
   const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [agreed, setAgreed] = useState(false);
+
   const [code, setCode] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -64,51 +105,22 @@ export default function AuthScreen({ role, onSuccess, onBack }: Props) {
 
   async function handleSendOtp() {
     setError("");
+    if (!lastName.trim()) { setError("Введите фамилию"); return; }
+    if (!firstName.trim()) { setError("Введите имя"); return; }
     const raw = getRawPhone();
     const digits = raw.replace(/\D/g, "");
-    if (digits.length < 11) {
-      setError("Введите полный номер телефона");
-      return;
-    }
+    if (digits.length < 11) { setError("Введите полный номер телефона"); return; }
+    if (!address.trim()) { setError("Введите адрес"); return; }
+    if (!agreed) { setError("Необходимо согласие на обработку персональных данных"); return; }
+
     setLoading(true);
     try {
       const res = await sendOtp(raw);
-      if (res.error) {
-        setError(res.error);
-        return;
-      }
+      if (res.error) { setError(res.error); return; }
       if (res.dev_code) setDevCode(res.dev_code);
       setStep("code");
       setCountdown(60);
       setTimeout(() => inputsRef.current[0]?.focus(), 100);
-    } catch {
-      setError("Ошибка сети. Попробуйте снова.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleVerify() {
-    const fullCode = code.join("");
-    if (fullCode.length < 6) {
-      setError("Введите 6-значный код");
-      return;
-    }
-    setError("");
-    setLoading(true);
-    try {
-      const res = await verifyOtp(getRawPhone(), fullCode, role);
-      if (res.error) {
-        setError(res.error);
-        setCode(["", "", "", "", "", ""]);
-        inputsRef.current[0]?.focus();
-        return;
-      }
-      if (res.success && res.user && res.token) {
-        localStorage.setItem("auth_token", res.token);
-        localStorage.setItem("user", JSON.stringify(res.user));
-        onSuccess(res.user);
-      }
     } catch {
       setError("Ошибка сети. Попробуйте снова.");
     } finally {
@@ -121,9 +133,7 @@ export default function AuthScreen({ role, onSuccess, onBack }: Props) {
     const newCode = [...code];
     newCode[index] = digit;
     setCode(newCode);
-    if (digit && index < 5) {
-      inputsRef.current[index + 1]?.focus();
-    }
+    if (digit && index < 5) inputsRef.current[index + 1]?.focus();
     if (newCode.every((d) => d !== "") && digit) {
       setTimeout(() => handleVerifyCode(newCode), 100);
     }
@@ -141,7 +151,10 @@ export default function AuthScreen({ role, onSuccess, onBack }: Props) {
     setError("");
     setLoading(true);
     try {
-      const res = await verifyOtp(getRawPhone(), fullCode, role);
+      const res = await verifyOtp(getRawPhone(), fullCode, role, {
+        name: `${lastName.trim()} ${firstName.trim()}`,
+        address: address.trim(),
+      });
       if (res.error) {
         setError(res.error);
         setCode(["", "", "", "", "", ""]);
@@ -173,19 +186,18 @@ export default function AuthScreen({ role, onSuccess, onBack }: Props) {
         }}
       />
 
-      <div className="flex-1 flex flex-col px-6 pt-12 pb-8 relative z-10">
+      <div className="flex-1 flex flex-col px-6 pt-10 pb-8 relative z-10 overflow-y-auto">
         <button
-          onClick={step === "code" ? () => setStep("phone") : onBack}
-          className="flex items-center gap-2 text-muted-foreground mb-8 w-fit"
+          onClick={step === "code" ? () => setStep("register") : onBack}
+          className="flex items-center gap-2 text-muted-foreground mb-6 w-fit flex-shrink-0"
         >
           <Icon name="ArrowLeft" size={18} />
           <span className="text-sm">Назад</span>
         </button>
 
-        <div className="flex-1 flex flex-col justify-center max-w-xs mx-auto w-full">
-          {/* Иконка роли */}
+        <div className="max-w-xs mx-auto w-full">
           <div
-            className="w-16 h-16 rounded-2xl mb-6 flex items-center justify-center text-3xl"
+            className="w-14 h-14 rounded-2xl mb-5 flex items-center justify-center text-2xl flex-shrink-0"
             style={{
               background: isLime ? "rgba(170,255,0,0.12)" : "rgba(187,68,255,0.12)",
               border: `1px solid ${isLime ? "rgba(170,255,0,0.3)" : "rgba(187,68,255,0.3)"}`,
@@ -194,22 +206,37 @@ export default function AuthScreen({ role, onSuccess, onBack }: Props) {
             {role === "customer" ? "🏠" : "⚡"}
           </div>
 
-          {step === "phone" ? (
+          {step === "register" ? (
             <>
               <h1 className="font-display font-900 text-2xl mb-1">
-                {role === "customer" ? "Вход заказчика" : "Вход исполнителя"}
+                {role === "customer" ? "Регистрация заказчика" : "Регистрация исполнителя"}
               </h1>
-              <p className="text-sm text-muted-foreground mb-8">
-                Введи номер телефона — пришлём код подтверждения
+              <p className="text-sm text-muted-foreground mb-5">
+                Заполни данные для регистрации
               </p>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
+                <div
+                  className="px-3 py-2 rounded-xl border text-xs font-600 text-center"
+                  style={{
+                    background: isLime ? "rgba(170,255,0,0.08)" : "rgba(187,68,255,0.08)",
+                    borderColor: isLime ? "rgba(170,255,0,0.25)" : "rgba(187,68,255,0.25)",
+                    color: accentColor,
+                  }}
+                >
+                  {role === "customer" ? "Я — заказчик" : "Я — исполнитель"}
+                </div>
+
+                <InputField label="Фамилия" value={lastName} onChange={setLastName} placeholder="Иванов" accentColor={accentColor} />
+                <InputField label="Имя" value={firstName} onChange={setFirstName} placeholder="Иван" accentColor={accentColor} />
+
                 <div>
+                  <p className="text-xs text-muted-foreground mb-1.5">Номер телефона</p>
                   <div
-                    className="flex items-center gap-3 glass rounded-2xl px-4 py-4 border transition-all"
+                    className="flex items-center gap-3 glass rounded-2xl px-4 py-3.5 border transition-all"
                     style={{ borderColor: phone ? `${accentColor}40` : "rgba(255,255,255,0.1)" }}
                   >
-                    <span className="text-muted-foreground text-sm">🇷🇺</span>
+                    <span className="text-sm">🇷🇺</span>
                     <input
                       type="tel"
                       value={formatPhone(phone)}
@@ -218,24 +245,51 @@ export default function AuthScreen({ role, onSuccess, onBack }: Props) {
                         setPhone(digits.slice(0, 11));
                         setError("");
                       }}
-                      onKeyDown={(e) => e.key === "Enter" && handleSendOtp()}
                       placeholder="+7 (999) 000-00-00"
-                      className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground text-base outline-none"
-                      autoFocus
+                      className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground text-sm outline-none"
                     />
                     {phone && (
                       <button onClick={() => setPhone("")}>
-                        <Icon name="X" size={16} className="text-muted-foreground" />
+                        <Icon name="X" size={14} className="text-muted-foreground" />
                       </button>
                     )}
                   </div>
-                  {error && (
-                    <p className="text-destructive text-xs mt-2 flex items-center gap-1">
-                      <Icon name="AlertCircle" size={12} />
-                      {error}
-                    </p>
-                  )}
                 </div>
+
+                <InputField
+                  label="Адрес вывоза мусора"
+                  value={address}
+                  onChange={setAddress}
+                  placeholder="ул. Ленина, д. 1, кв. 10"
+                  accentColor={accentColor}
+                />
+
+                <button
+                  onClick={() => setAgreed(!agreed)}
+                  className="flex items-start gap-3 w-full text-left"
+                >
+                  <div
+                    className="w-5 h-5 rounded-md border flex-shrink-0 mt-0.5 flex items-center justify-center transition-all"
+                    style={{
+                      borderColor: agreed ? accentColor : "rgba(255,255,255,0.25)",
+                      background: agreed ? accentColor : "transparent",
+                    }}
+                  >
+                    {agreed && <Icon name="Check" size={12} className={isLime ? "text-[hsl(220,20%,8%)]" : "text-white"} />}
+                  </div>
+                  <span className="text-xs text-muted-foreground leading-relaxed">
+                    Я даю согласие на{" "}
+                    <span style={{ color: accentColor }}>обработку персональных данных</span>{" "}
+                    в соответствии с ФЗ № 152-ФЗ
+                  </span>
+                </button>
+
+                {error && (
+                  <p className="text-destructive text-xs flex items-center gap-1">
+                    <Icon name="AlertCircle" size={12} />
+                    {error}
+                  </p>
+                )}
 
                 <button
                   onClick={handleSendOtp}
@@ -245,120 +299,74 @@ export default function AuthScreen({ role, onSuccess, onBack }: Props) {
                     background: isLime
                       ? "linear-gradient(135deg, #aaff00, #66dd00)"
                       : "linear-gradient(135deg, #bb44ff, #7722cc)",
-                    color: isLime ? "hsl(220,20%,8%)" : "#ffffff",
-                    boxShadow: isLime
-                      ? "0 0 20px rgba(170,255,0,0.3)"
-                      : "0 0 20px rgba(187,68,255,0.3)",
+                    color: isLime ? "hsl(220,20%,8%)" : "#fff",
                   }}
                 >
-                  {loading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Icon name="Loader2" size={18} className="animate-spin" />
-                      Отправляем...
-                    </span>
-                  ) : (
-                    "Получить код"
-                  )}
+                  {loading ? "Отправка..." : "Получить код подтверждения"}
                 </button>
               </div>
             </>
           ) : (
             <>
-              <h1 className="font-display font-900 text-2xl mb-1">Код подтверждения</h1>
-              <p className="text-sm text-muted-foreground mb-2">
-                Отправили SMS на{" "}
-                <span className="text-foreground">{formatPhone(phone)}</span>
+              <h1 className="font-display font-900 text-2xl mb-1">Введи код</h1>
+              <p className="text-sm text-muted-foreground mb-6">
+                Отправили на <span className="text-foreground font-600">{formatPhone(phone)}</span>
               </p>
 
-              {devCode && (
-                <div
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl mb-6 text-xs"
-                  style={{ background: "rgba(170,255,0,0.08)", border: "1px solid rgba(170,255,0,0.2)" }}
-                >
-                  <Icon name="Code2" size={13} className="text-lime" />
-                  <span className="text-lime">
-                    Тестовый код: <strong>{devCode}</strong>
-                  </span>
-                </div>
-              )}
-
-              <div className="flex gap-2 mb-4 mt-4">
+              <div className="flex gap-2 justify-between mb-4">
                 {code.map((digit, i) => (
                   <input
                     key={i}
                     ref={(el) => { inputsRef.current[i] = el; }}
                     type="text"
                     inputMode="numeric"
-                    maxLength={2}
+                    maxLength={1}
                     value={digit}
                     onChange={(e) => handleCodeInput(i, e.target.value)}
                     onKeyDown={(e) => handleCodeKey(i, e)}
-                    className="flex-1 aspect-square text-center text-xl font-display font-900 glass rounded-2xl border outline-none transition-all"
+                    className="w-12 h-14 text-center text-xl font-display font-900 glass rounded-2xl border outline-none transition-all"
                     style={{
                       borderColor: digit ? `${accentColor}60` : "rgba(255,255,255,0.1)",
-                      color: digit ? accentColor : undefined,
-                      boxShadow: digit ? `0 0 12px ${accentColor}20` : undefined,
+                      color: digit ? accentColor : "inherit",
                     }}
                   />
                 ))}
               </div>
 
               {error && (
-                <p className="text-destructive text-xs mb-3 flex items-center gap-1">
+                <p className="text-destructive text-xs mb-4 flex items-center gap-1">
                   <Icon name="AlertCircle" size={12} />
                   {error}
                 </p>
               )}
 
-              <button
-                onClick={handleVerify}
-                disabled={loading || code.join("").length < 6}
-                className="w-full py-4 rounded-2xl font-display font-700 text-base transition-all active:scale-95 disabled:opacity-50 mb-4"
-                style={{
-                  background: isLime
-                    ? "linear-gradient(135deg, #aaff00, #66dd00)"
-                    : "linear-gradient(135deg, #bb44ff, #7722cc)",
-                  color: isLime ? "hsl(220,20%,8%)" : "#ffffff",
-                  boxShadow: isLime
-                    ? "0 0 20px rgba(170,255,0,0.3)"
-                    : "0 0 20px rgba(187,68,255,0.3)",
-                }}
-              >
-                {loading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Icon name="Loader2" size={18} className="animate-spin" />
-                    Проверяем...
+              {devCode && (
+                <div className="mb-4 text-center">
+                  <span className="text-xs text-muted-foreground">
+                    Код для разработки: <span className="text-lime font-bold">{devCode}</span>
                   </span>
-                ) : (
-                  "Войти"
-                )}
-              </button>
+                </div>
+              )}
 
               <button
-                onClick={() => {
-                  if (countdown === 0) {
-                    setCode(["", "", "", "", "", ""]);
-                    handleSendOtp();
-                  }
-                }}
-                disabled={countdown > 0}
-                className="text-sm text-center w-full"
+                disabled={countdown > 0 || loading}
+                onClick={handleSendOtp}
+                className="w-full text-center text-sm text-muted-foreground disabled:opacity-40"
               >
-                {countdown > 0 ? (
-                  <span className="text-muted-foreground">
-                    Повторить через <span style={{ color: accentColor }}>{countdown}с</span>
-                  </span>
-                ) : (
-                  <span style={{ color: accentColor }}>Отправить код повторно</span>
-                )}
+                {countdown > 0 ? `Повторить через ${countdown} сек` : "Отправить код повторно"}
               </button>
+
+              {loading && (
+                <div className="flex justify-center mt-4">
+                  <div
+                    className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
+                    style={{ borderColor: `${accentColor} transparent transparent transparent` }}
+                  />
+                </div>
+              )}
             </>
           )}
         </div>
-
-        <p className="text-center text-xs text-muted-foreground/40 mt-8">
-          Нажимая «Войти», вы соглашаетесь с условиями использования
-        </p>
       </div>
     </div>
   );

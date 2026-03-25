@@ -241,74 +241,213 @@ function OrderCard({
   );
 }
 
+const TRASH_TYPES = [
+  { id: "ordinary", label: "Обычный мусор", emoji: "🗑️" },
+  { id: "bulk", label: "Крупный мусор", emoji: "📦" },
+  { id: "construction", label: "Строительный", emoji: "🧱" },
+];
+
+const BULK_PRESETS = ["Коробка (телевизор)", "Холодильник", "Стиральная машина", "Диван", "Матрас", "Велосипед", "Другое"];
+const CONSTRUCTION_PRESETS = ["Кирпичи", "Обои", "Пластик", "Плитка", "Доски", "Металл", "Стекло", "Другое"];
+
 function CreateOrderModal({ onClose }: { onClose: () => void }) {
-  const types = ["Обычный мусор", "Крупный мусор", "Раздельный сбор", "Строительный"];
-  const [selected, setSelected] = useState("Обычный мусор");
+  const [trashType, setTrashType] = useState("ordinary");
   const [price, setPrice] = useState(150);
+
+  const [weight, setWeight] = useState("");
+  const [bags, setBags] = useState("");
+
+  const [bulkSelected, setBulkSelected] = useState<string[]>([]);
+  const [bulkCustom, setBulkCustom] = useState("");
+
+  const [constSelected, setConstSelected] = useState<string[]>([]);
+  const [constCustom, setConstCustom] = useState("");
+
+  function toggleBulk(item: string) {
+    setBulkSelected((prev) =>
+      prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item]
+    );
+  }
+
+  function toggleConst(item: string) {
+    setConstSelected((prev) =>
+      prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item]
+    );
+  }
+
+  const savedUser = localStorage.getItem("user");
+  const userAddress = savedUser ? (JSON.parse(savedUser)?.address || "") : "";
 
   return (
     <div className="fixed inset-0 z-50 flex items-end" onClick={onClose}>
       <div
-        className="w-full glass-bright rounded-t-3xl p-6 space-y-4 animate-fade-in"
-        style={{ background: "hsl(220,18%,12%)", borderTop: "1px solid rgba(170,255,0,0.2)" }}
+        className="w-full rounded-t-3xl animate-fade-in overflow-y-auto"
+        style={{
+          background: "hsl(220,18%,12%)",
+          borderTop: "1px solid rgba(170,255,0,0.2)",
+          maxHeight: "90vh",
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between">
-          <h3 className="font-display font-900 text-lg">Новый заказ</h3>
-          <button onClick={onClose} className="w-8 h-8 glass rounded-full flex items-center justify-center">
-            <Icon name="X" size={16} />
+        <div className="p-6 space-y-5">
+          <div className="flex items-center justify-between">
+            <h3 className="font-display font-900 text-lg">Новый заказ</h3>
+            <button onClick={onClose} className="w-8 h-8 glass rounded-full flex items-center justify-center">
+              <Icon name="X" size={16} />
+            </button>
+          </div>
+
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">Тип мусора</p>
+            <div className="grid grid-cols-3 gap-2">
+              {TRASH_TYPES.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setTrashType(t.id)}
+                  className={`py-3 rounded-xl text-xs font-600 transition-all border flex flex-col items-center gap-1 ${
+                    trashType === t.id
+                      ? "border-lime/50 text-lime bg-lime/10"
+                      : "glass border-white/10 text-foreground/70"
+                  }`}
+                >
+                  <span className="text-lg">{t.emoji}</span>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {trashType === "ordinary" && (
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1.5">Вес мусора (примерно)</p>
+                <div className="glass rounded-xl px-4 py-3 border border-white/10 flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={weight}
+                    onChange={(e) => setWeight(e.target.value)}
+                    placeholder="например: 5 кг"
+                    className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+                  />
+                  <span className="text-xs text-muted-foreground">кг</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1.5">Количество пакетов</p>
+                <div className="glass rounded-xl px-4 py-3 border border-white/10 flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={bags}
+                    onChange={(e) => setBags(e.target.value)}
+                    placeholder="например: 3"
+                    className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+                    min={1}
+                  />
+                  <span className="text-xs text-muted-foreground">шт</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {trashType === "bulk" && (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">Что нужно вынести?</p>
+              <div className="flex flex-wrap gap-2">
+                {BULK_PRESETS.map((item) => (
+                  <button
+                    key={item}
+                    onClick={() => toggleBulk(item)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-500 border transition-all ${
+                      bulkSelected.includes(item)
+                        ? "border-lime/50 text-lime bg-lime/10"
+                        : "glass border-white/10 text-foreground/70"
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1.5">Или опишите своими словами</p>
+                <div className="glass rounded-xl px-4 py-3 border border-white/10">
+                  <textarea
+                    value={bulkCustom}
+                    onChange={(e) => setBulkCustom(e.target.value)}
+                    placeholder="Опишите крупный мусор..."
+                    className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none"
+                    rows={2}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {trashType === "construction" && (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">Тип строительного мусора</p>
+              <div className="flex flex-wrap gap-2">
+                {CONSTRUCTION_PRESETS.map((item) => (
+                  <button
+                    key={item}
+                    onClick={() => toggleConst(item)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-500 border transition-all ${
+                      constSelected.includes(item)
+                        ? "border-lime/50 text-lime bg-lime/10"
+                        : "glass border-white/10 text-foreground/70"
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1.5">Или опишите своими словами</p>
+                <div className="glass rounded-xl px-4 py-3 border border-white/10">
+                  <textarea
+                    value={constCustom}
+                    onChange={(e) => setConstCustom(e.target.value)}
+                    placeholder="Опишите строительный мусор..."
+                    className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none"
+                    rows={2}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <div className="flex justify-between mb-2">
+              <p className="text-xs text-muted-foreground">Вознаграждение</p>
+              <span className="text-lime font-display font-900">{price} ₽</span>
+            </div>
+            <input
+              type="range"
+              min={50}
+              max={500}
+              step={10}
+              value={price}
+              onChange={(e) => setPrice(Number(e.target.value))}
+              className="w-full accent-lime"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+              <span>50 ₽</span>
+              <span>500 ₽</span>
+            </div>
+          </div>
+
+          {userAddress && (
+            <div className="glass rounded-xl p-3 border border-white/8">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Icon name="MapPin" size={14} className="text-lime" />
+                <span className="text-sm">{userAddress}</span>
+              </div>
+            </div>
+          )}
+
+          <button className="w-full py-4 rounded-2xl gradient-lime font-display font-700 text-[hsl(220,20%,8%)] text-base glow-lime transition-transform active:scale-95">
+            Разместить заказ за {price} ₽
           </button>
         </div>
-
-        <div>
-          <p className="text-xs text-muted-foreground mb-2">Тип мусора</p>
-          <div className="grid grid-cols-2 gap-2">
-            {types.map((t) => (
-              <button
-                key={t}
-                onClick={() => setSelected(t)}
-                className={`py-2.5 rounded-xl text-sm font-500 transition-all border ${
-                  selected === t
-                    ? "border-lime/50 text-lime bg-lime/10"
-                    : "glass border-white/10 text-foreground/70"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <div className="flex justify-between mb-2">
-            <p className="text-xs text-muted-foreground">Вознаграждение</p>
-            <span className="text-lime font-display font-900">{price} ₽</span>
-          </div>
-          <input
-            type="range"
-            min={50}
-            max={500}
-            step={10}
-            value={price}
-            onChange={(e) => setPrice(Number(e.target.value))}
-            className="w-full accent-lime"
-          />
-          <div className="flex justify-between text-xs text-muted-foreground mt-1">
-            <span>50 ₽</span>
-            <span>500 ₽</span>
-          </div>
-        </div>
-
-        <div className="glass rounded-xl p-3 border border-white/8">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Icon name="MapPin" size={14} className="text-lime" />
-            <span className="text-sm">ул. Ленина, 42, кв. 15 — определено автоматически</span>
-          </div>
-        </div>
-
-        <button className="w-full py-4 rounded-2xl gradient-lime font-display font-700 text-[hsl(220,20%,8%)] text-base glow-lime transition-transform active:scale-95">
-          Разместить заказ за {price} ₽
-        </button>
       </div>
     </div>
   );

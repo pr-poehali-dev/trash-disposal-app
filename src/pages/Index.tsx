@@ -116,14 +116,7 @@ function WelcomeScreen({ onSelect }: { onSelect: (r: Role) => void }) {
           <RoleCard role="executor" emoji="⚡" title="Я исполнитель" desc="Выполняю заказы и зарабатываю" accent="purple" onSelect={onSelect} />
         </div>
 
-        <div className="flex gap-6 mt-8 slide-up" style={{ animationDelay: "0.2s" }}>
-          {[{ icon: "🔒", text: "Верификация" }, { icon: "📸", text: "Фото-отчёт" }, { icon: "🎙️", text: "Алиса" }].map((f) => (
-            <div key={f.text} className="flex flex-col items-center gap-1">
-              <span className="text-xl">{f.icon}</span>
-              <span className="text-xs text-muted-foreground">{f.text}</span>
-            </div>
-          ))}
-        </div>
+
       </div>
 
       <p className="text-center text-xs text-muted-foreground/40 pb-6 relative z-10">МусорОфф v1.0 — для молодых и активных</p>

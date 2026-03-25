@@ -1,0 +1,1 @@
+ALTER TABLE t_p32559361_trash_disposal_app.users ADD COLUMN IF NOT EXISTS address text NULL;

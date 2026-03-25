@@ -13,17 +13,22 @@ export async function sendOtp(phone: string): Promise<{ success: boolean; dev_co
   try { return JSON.parse(JSON.parse(text)); } catch { return JSON.parse(text); }
 }
 
-export async function verifyOtp(phone: string, code: string, role: string): Promise<{
+export async function verifyOtp(
+  phone: string,
+  code: string,
+  role: string,
+  regData?: { name?: string; address?: string }
+): Promise<{
   success?: boolean;
   token?: string;
   is_new?: boolean;
-  user?: { id: string; phone: string; name: string | null; role: string; verified: boolean };
+  user?: { id: string; phone: string; name: string | null; role: string; address: string | null; verified: boolean };
   error?: string;
 }> {
   const res = await fetch(URLS['verify-otp'], {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone, code, role }),
+    body: JSON.stringify({ phone, code, role, ...regData }),
   });
   const text = await res.text();
   try { return JSON.parse(JSON.parse(text)); } catch { return JSON.parse(text); }
